@@ -734,21 +734,64 @@
         
         // --- Display Functions ---
 
-        function displayResults(results, validParticipants) {
-            RECOMMENDATIONS_LIST.innerHTML = '';
-            
-            if (results.length === 0) {
-                RECOMMENDATIONS_LIST.innerHTML = '<p class="text-gray-500 italic">No valid meetup locations could be calculated. Please check your addresses or API quota.</p>';
-                RESULTS_SECTION.classList.remove('hidden');
-                return;
-            }
+                // Change function signature
+        function displayResults(results, validParticipants, isochroneGeoJSON) {
+            // ... (existing code for map and markers)
             
             // Check if L (Leaflet) is defined before trying to initialize the map
-            if (typeof L === 'undefined') {
-                RECOMMENDATIONS_LIST.innerHTML = '<p class="text-red-500 font-bold">Error: Map library (Leaflet) failed to load. Cannot display map or markers.</p>';
-                RESULTS_SECTION.classList.remove('hidden');
-                return;
+            // ... (existing L check)
+
+            // Initialize Map
+            // ... (existing map init)
+
+            // Track map bounds
+            const bounds = L.latLngBounds([]);
+
+            // 1. Add participant markers and update bounds
+            // ... (existing participant markers)
+            
+            // 2. Add Location Marker and update bounds
+            results.forEach((location, index) => {
+                location.rank = index + 1;
+                
+                // Use index 0 for Centroid, index 1 for BEST real spot, etc.
+                const effectiveRank = location.isCentroid ? 0 : index; 
+                
+                const markerType = location.isCentroid ? 'center' : 'landmark';
+                addMarker(location.lat, location.lon, `**#${effectiveRank} ${location.placeName}**<br>Total Distance: ${formatDistance(location.totalDistance, location.allRouted)}`, markerType);
+                bounds.extend([location.lat, location.lon]);
+                
+                // ... (rest of HTML card generation)
+            });
+            
+            // --- NEW ISOCHRONE VISUALIZATION ---
+            if (isochroneGeoJSON && map) {
+                const isochroneLayer = L.geoJSON(isochroneGeoJSON, {
+                    style: {
+                        color: '#6A5ACD', // Slate Blue
+                        weight: 2,
+                        opacity: 0.5,
+                        fillColor: '#6A5ACD',
+                        fillOpacity: 0.1
+                    }
+                }).addTo(map);
+                bounds.extend(isochroneLayer.getBounds()); // Include the polygon in bounds calculation
+                
+                document.getElementById('sources-container').innerHTML += `
+                    <p class="text-xs text-gray-500 mt-1">Isochrone area shows locations reachable from the center within ${formatTime(bestTravelTime)}.
+                `;
+                
+                // 
             }
+            // ------------------------------------
+
+            // 3. Fit Map to Bounds
+            // ... (existing map fitBounds logic)
+
+            RESULTS_SECTION.classList.remove('hidden');
+            setTimeout(() => map.invalidateSize(), 300); 
+        }
+
 
             // Initialize Map
             const initialCenter = results[0];
