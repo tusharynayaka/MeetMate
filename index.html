@@ -3,454 +3,464 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Meetup Planner Extended (Latlong.ai API)</title>
+    <title>Optimal Meetup Finder</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <!-- Leaflet CSS -->
-    <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-o9N1jRVvZxfqHkRbG3gGkM2JCM0CwBv8i1AqVx4ZpFk="
-    crossorigin=""
-/>
-
-<!-- Leaflet JS -->
-    <script
-    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-o8EeH4x3Efr2E1VlzDqgW8sELpAo0P5IL2H1k3x1pPc="
-    crossorigin=""
-></script>
-
-    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin=""/>
     <style>
-        :root { --primary-color: #4f46e5; --secondary-color: #ec4899; }
-        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
-        .container-card { 
-            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1); 
-            max-width: 90%; 
-            margin: 2rem auto; 
-            background: linear-gradient(145deg, #ffffff, #f0f0f0); 
-            border: 1px solid #e5e7eb; 
-            transition: all 0.3s ease-in-out; 
-        }
-        @media (min-width: 640px) { .container-card { max-width: 800px; } }
-        .submit-button { 
-            transition: all 0.2s ease-in-out; 
-            background-image: linear-gradient(to right top, var(--primary-color), #6366f1); 
-        }
-        .submit-button:hover { opacity: 0.9; transform: translateY(-1px); }
-        .loading-spinner { 
-            border: 4px solid rgba(255, 255, 255, 0.3); 
-            border-top: 4px solid #ffffff; 
-            border-radius: 50%; 
-            width: 1.5rem;
-            height: 1.5rem;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        .travel-table th, .travel-table td {
-            padding: 8px;
-            text-align: left;
-            border-bottom: 1px solid #e5e7eb;
-        }
-        .travel-table th {
-            font-weight: 600;
-            color: #4f46e5;
-            background-color: #eef2ff;
-        }
-        .join-code-display {
-            font-family: 'Courier New', monospace;
-            letter-spacing: 4px;
-            font-size: 2rem;
-        }
-        #map-container {
-            height: 400px;
-            border-radius: 8px;
-            margin-top: 1rem;
-            border: 1px solid #ccc;
-        }
+        /* Custom styles for map and loading state */
+        #map { height: 400px; border-radius: 0.75rem; }
         .isochrone-badge {
             display: inline-block;
-            background-color: #ec4899;
+            padding: 2px 8px;
+            font-size: 0.6rem;
+            font-weight: bold;
+            line-height: 1;
+            border-radius: 9999px; /* fully rounded */
+            text-transform: uppercase;
             color: white;
+            margin-left: 0.5rem;
+        }
+        .travel-table {
+            border-collapse: separate;
+            border-spacing: 0;
+            border: 1px solid #e5e7eb;
+            width: 100%;
+        }
+        .travel-table th {
+            background-color: #f3f4f6;
+            color: #4b5563;
+            text-align: left;
+            padding: 8px 8px;
             font-size: 0.75rem;
-            padding: 2px 6px;
-            border-radius: 4px;
-            margin-left: 8px;
+            font-weight: 600;
+            text-transform: uppercase;
         }
-        /* Custom Leaflet Icon Styles (must be in the <style> block) */
-        .custom-div-icon {
+        .travel-table td {
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.8);
             display: flex;
-            align-items: center;
             justify-content: center;
-            box-sizing: border-box;
-            line-height: 1; /* Adjust to better center the emoji/text */
-            transform: translate(-50%, -100%); /* Center the icon bottom point */
+            align-items: center;
+            z-index: 1000;
         }
+        .hidden { display: none !important; }
+
+        /* Custom Leaflet Icons */
+        .origin-marker { background-color: #ef4444; border: 3px solid white; }
+        .center-marker { background-color: #4f46e5; border: 3px solid white; }
+        .landmark-marker { background-color: #10b981; border: 3px solid white; }
     </style>
 </head>
-<body>
-    <div class="min-h-screen flex items-start justify-center p-4">
-        <div class="container-card p-6 md:p-10 rounded-xl w-full">
-            <h1 class="text-3xl font-bold text-gray-800 mb-2 text-center">Meetup Planner Extended (Latlong.ai API)</h1>
-            <p class="text-gray-500 text-center mb-6">Uses **Latlong.ai** for accurate distance and landmark suggestions.</p>
+<body class="bg-gray-50 min-h-screen">
 
-            <div class="mt-4 p-3 bg-indigo-100 text-indigo-700 rounded-lg" role="alert">
-                <p class="font-bold">✅ Latlong.ai API Token Loaded</p>
-                <p class="text-sm">Ready for Geocoding, Distance Matrix, and Landmark calculations.</p>
+    <div id="loading-spinner" class="loading-overlay fixed" style="z-index: 2000;">
+        <div class="flex flex-col items-center">
+            <svg class="animate-spin -ml-1 mr-3 h-10 w-10 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="mt-4 text-indigo-600 font-semibold">Loading App...</p>
+        </div>
+    </div>
+    
+    <div id="app-container" class="max-w-4xl mx-auto p-4 md:p-8 relative hidden">
+        
+        <header class="mb-8 flex justify-between items-center border-b pb-4">
+            <h1 class="text-3xl font-extrabold text-gray-900 flex items-center">
+                📍 Meetup Pro
+            </h1>
+            <div class="flex items-center space-x-3">
+                <span id="user-display-name" class="font-medium text-indigo-600">Guest</span>
+                <button id="go-to-profile-btn" class="text-sm text-gray-600 hover:text-indigo-600 underline">Update Profile</button>
             </div>
+        </header>
 
-            <div id="status-message" class="mt-4 p-3 bg-red-100 text-red-700 rounded-lg hidden" role="alert"></div>
+        <div id="status-container" class="p-3 mb-6 rounded-lg bg-indigo-100 text-indigo-800 font-medium hidden">
+            <p id="status-message">Loading...</p>
+        </div>
 
-            <div id="initial-loading" class="text-center py-10">
-                <div class="loading-spinner mx-auto mb-3 border-indigo-500 border-t-indigo-500 w-8 h-8"></div>
-                <p class="text-gray-500">Initializing services...</p>
-            </div>
-
-            <div id="view-profile" class="hidden space-y-4">
-                <h2 class="text-xl font-semibold text-gray-700 mb-4 border-b pb-2">Profile Setup Required</h2>
-                <div class="p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded-lg text-sm text-yellow-700">
-                    <p class="font-medium">Welcome!</p>
-                    <p>To join or create a group, please save your unique display name and primary home locality. **Enter your Pin Code followed by the City/Locality Name**.</p>
-                </div>
-                <form id="profile-form" class="space-y-4">
-                    <div>
-                        <label for="profile-name" class="block text-sm font-medium text-gray-700 mb-1">Display Name</label>
-                        <input type="text" id="profile-name" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-pink-500 focus:border-pink-500">
+        <div id="main-view">
+            
+            <div id="profile-view" class="bg-white p-6 rounded-xl shadow-lg border border-gray-100 hidden">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">🏠 Setup Your Home Location</h2>
+                <p class="text-gray-600 mb-4">We need your name and a reference point (like Pin Code + City) to calculate the best meetup spot.</p>
+                <form id="profile-form">
+                    <div class="mb-4">
+                        <label for="profile-name" class="block text-sm font-medium text-gray-700">Display Name</label>
+                        <input type="text" id="profile-name-input" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 border">
                     </div>
-                    <div>
-                        <label for="home-locality" class="block text-sm font-medium text-gray-700 mb-1">Primary Home Locality/Address</label>
-                        <input type="text" id="home-locality" required placeholder="e.g., 560013, Bengaluru" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-pink-500 focus:border-pink-500">
+                    <div class="mb-4">
+                        <label for="home-locality" class="block text-sm font-medium text-gray-700">Home Locality / Pin Code & City</label>
+                        <input type="text" id="home-locality-input" required placeholder="e.g., 560013, Bengaluru" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 border">
+                        <p class="text-xs text-gray-500 mt-1">This will be used to get your precise latitude and longitude via Latlong.ai Geocoding.</p>
                     </div>
-                    <button type="submit" id="save-profile-btn" class="w-full text-white font-semibold py-3 rounded-xl bg-pink-500 hover:bg-pink-600 transition">
-                        <span class="flex items-center justify-center">
-                            <span id="profile-button-text">Save Profile & Continue</span>
-                            <div id="profile-loading-indicator" class="loading-spinner hidden ml-3 border-white border-t-white"></div>
-                        </span>
+                    <button type="submit" id="save-profile-btn" class="w-full inline-flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        Save Profile & Continue
                     </button>
                 </form>
             </div>
 
-            <div id="view-main" class="hidden space-y-6">
-                <div class="bg-indigo-50 p-3 rounded-lg flex justify-between items-center text-sm border border-indigo-200">
-                    <p class="font-medium text-indigo-800 truncate">Logged in as <span id="user-display-name" class="font-bold"></span></p>
-                    <button id="go-to-profile" class="text-xs text-indigo-600 hover:text-indigo-900 transition underline ml-4 flex-shrink-0">Edit Profile</button>
+            <div id="create-join-view" class="space-y-6 hidden">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">🤝 Start or Join a Session</h2>
+
+                <div id="create-group-section" class="bg-white p-6 rounded-xl shadow-lg border border-indigo-200">
+                    <h3 class="text-xl font-semibold text-indigo-700 mb-3">🚀 Create New Meetup</h3>
+                    <div class="mb-4">
+                        <label for="occasion-create" class="block text-sm font-medium text-gray-700">What are you meeting for?</label>
+                        <select id="occasion-create" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border">
+                            <option value="">Select an Occasion</option>
+                            <option value="Casual Dinner">Casual Dinner</option>
+                            <option value="Business Meeting">Business Meeting</option>
+                            <option value="Weekend Trip">Weekend Trip</option>
+                            <option value="Study Session">Study Session</option>
+                        </select>
+                    </div>
+                    <button id="create-group-btn" class="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">
+                        Create Group
+                    </button>
+                    <button id="show-join-btn" class="w-full mt-2 py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                        I have a code, let me join
+                    </button>
                 </div>
 
-                <div class="flex space-x-4">
-                    <button id="show-create-btn" class="flex-1 py-2 font-medium rounded-lg transition-colors border-b-4 border-indigo-500 text-indigo-700 bg-indigo-100 shadow-md">Create Group</button>
-                    <button id="show-join-btn" class="flex-1 py-2 font-medium rounded-lg transition-colors border-b-2 border-gray-300 text-gray-700 hover:bg-gray-100">Join Group</button>
-                </div>
-
-                <div id="view-create" class="space-y-4">
-                    <h2 class="text-xl font-semibold text-gray-700 mb-2">Create New Group</h2>
-                    <select id="occasion-create" required class="w-full p-3 border border-gray-300 rounded-lg bg-white focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out">
-                        <option value="" disabled selected>Select an occasion</option>
-                        <option value="Cafe or Casual Hangout">Cafe or Casual Hangout</option>
-                        <option value="Fine Dining Restaurant">Fine Dining Restaurant</option>
-                        <option value="Museum or Cultural Site">Museum or Cultural Site</option>
-                        <option value="Public Park or Gardens">Public Park or Gardens</option>
-                        <option value="Major Transit Station">Major Transit Station (Traveler Meetup)</option>
-                    </select>
-                    <button type="button" id="create-group-btn" class="submit-button w-full text-white font-semibold py-3 rounded-xl">Create Group & Get Code</button>
-                </div>
-
-                <div id="view-join" class="hidden space-y-4">
-                    <h2 class="text-xl font-semibold text-gray-700 mb-2">Join Existing Group</h2>
-                    <div>
-                        <label for="join-code-input" class="block text-sm font-medium text-gray-700 mb-1">Enter 6-Character Join Code</label>
-                        <input type="text" id="join-code-input" maxlength="6" placeholder="ABC123" required class="w-full p-3 text-center text-xl tracking-wider uppercase border border-gray-300 rounded-lg focus:ring-pink-500 focus:border-pink-500">
+                <div id="join-group-section" class="bg-white p-6 rounded-xl shadow-lg border border-green-200 hidden">
+                    <h3 class="text-xl font-semibold text-green-700 mb-3">🔗 Join Existing Meetup</h3>
+                    <div class="mb-4">
+                        <label for="join-code-input" class="block text-sm font-medium text-gray-700">Enter 4-Digit Join Code</label>
+                        <input type="text" id="join-code-input" maxlength="4" placeholder="e.g., ABCD" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 p-2 border uppercase text-center font-bold text-lg">
                     </div>
-                    <button type="button" id="join-by-code-btn" class="w-full text-white font-semibold py-3 rounded-xl bg-pink-500 hover:bg-pink-600 transition">Join Group</button>
-                </div>
-
-                <div id="view-session" class="hidden space-y-4 pt-4 border-t border-gray-200">
-                    <h2 class="text-xl font-semibold text-gray-700 mb-2">Active Session <span id="session-occasion"></span></h2>
-
-                    <div id="join-code-box" class="mt-2 p-4 bg-indigo-50 border-2 border-indigo-300 rounded-xl text-center">
-                        <p class="text-sm font-medium text-indigo-700 mb-2">Share this Join Code</p>
-                        <div class="flex justify-center items-center space-x-3">
-                            <span id="session-join-code" class="join-code-display font-extrabold text-indigo-900 select-all"></span>
-                            <button type="button" id="copy-code-btn" class="flex-shrink-0 px-3 py-1 bg-indigo-500 text-white text-sm font-medium rounded-lg hover:bg-indigo-600 transition duration-150 ease-in-out">Copy</button>
-                        </div>
-                    </div>
-
-                    <h3 class="text-lg font-semibold text-gray-700 mt-6">Participants <span id="participant-count">0</span></h3>
-                    <div id="participants-list" class="space-y-2 p-3 bg-white rounded-lg border border-gray-200">
-                        <p class="text-gray-500 italic">Waiting for participants to join...</p>
-                    </div>
-
-                    <div class="flex flex-col space-y-3 mt-6">
-                        <button type="button" id="calculate-btn" class="submit-button w-full text-white font-semibold py-3 rounded-xl flex items-center justify-center focus:outline-none focus:ring-4 focus:ring-indigo-500 focus:ring-opacity-50 disabled:opacity-50" disabled>
-                            <span id="button-text">Find Optimal Center & Real-World Landmarks</span>
-                            <div id="loading-indicator" class="loading-spinner hidden ml-3"></div>
-                        </button>
-                        <button type="button" id="end-session-btn" class="w-full text-sm font-semibold py-3 rounded-xl flex items-center justify-center bg-gray-200 text-gray-700 hover:bg-gray-300 transition duration-150 ease-in-out">End Session & Create New Group</button>
-                    </div>
-                </div>
-
-                <div id="results-section" class="mt-8 pt-6 border-t border-gray-200 hidden">
-                    <h2 class="text-2xl font-semibold text-gray-700 mb-4">Top Recommendations</h2>
-                    
-                    <div id="map-container" class="mb-6"></div>
-
-                    <div id="recommendations-list" class="space-y-6"></div>
-                    <div id="sources-container" class="mt-6 text-xs text-gray-500 border-t pt-4">
-                        <p class="font-medium mb-2">Data Source: **Latlong.ai API Hub** (Geocoding, Distance Matrix, Landmark APIs)</p>
-                    </div>
+                    <button id="join-by-code-btn" class="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700">
+                        Join Session
+                    </button>
+                    <button id="show-create-btn" class="w-full mt-2 py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                        I want to create a new session
+                    </button>
                 </div>
             </div>
+
+            <div id="session-view" class="space-y-8 hidden">
+                
+                <div class="bg-white p-6 rounded-xl shadow-lg border border-indigo-400">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-2xl font-bold text-gray-800">Active Session <span id="session-occasion" class="text-lg font-normal text-indigo-500"></span></h2>
+                        <button id="end-session-btn" class="text-sm text-red-500 hover:text-red-700 font-medium">End Session</button>
+                    </div>
+                    
+                    <div class="flex items-center justify-between border-b pb-3 mb-3">
+                        <p class="text-lg font-medium text-gray-700">
+                            Join Code: 
+                            <span id="session-join-code" class="text-2xl font-extrabold text-indigo-600 tracking-wider ml-2">ABCD</span>
+                        </p>
+                        <button id="copy-code-btn" class="py-1 px-3 border border-indigo-300 rounded-md text-xs font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100">
+                            Copy Code
+                        </button>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-gray-700 mb-2 flex justify-between items-center">
+                        Participants (<span id="participant-count">0</span>)
+                    </h3>
+                    <div id="participants-list" class="bg-gray-50 p-3 rounded-lg max-h-40 overflow-y-auto">
+                        </div>
+                    
+                    <div class="mt-6">
+                        <button id="calculate-btn" disabled class="w-full py-3 px-4 rounded-md shadow-lg text-lg font-bold text-white bg-green-600 disabled:bg-gray-400 hover:bg-green-700 disabled:hover:bg-gray-400 transition-colors">
+                            Calculate Optimal Meetup Spot
+                        </button>
+                        <p class="text-center text-sm text-gray-500 mt-2">Need at least 2 participants.</p>
+                    </div>
+                </div>
+
+                <div id="results-section" class="hidden space-y-6">
+                    <h2 class="text-2xl font-bold text-gray-800">Optimal Location Results 🏆</h2>
+
+                    <div id="map-container" class="bg-white p-4 rounded-xl shadow-lg">
+                        <div id="map"></div>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <h3 class="text-xl font-semibold text-gray-700">Top Recommendations (Ranked by Total Travel Distance)</h3>
+                        <div id="recommendations-list" class="space-y-4">
+                            </div>
+                    </div>
+
+                    <div id="sources-container" class="text-xs text-gray-500 border-t pt-4">
+                        </div>
+                </div>
+            </div>
+
         </div>
+
     </div>
 
-    <script type="module">
-        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
-        import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
-        import { getFirestore, doc, getDoc, setDoc, addDoc, collection, onSnapshot, updateDoc, arrayUnion, query, where, getDocs, deleteDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20n6a9KxI6vD9qf8yA8Gj+7V2eGshAeM0z50/f+mzN6M="
+        crossorigin=""></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js"></script>
 
+    <script>
         // =========================================================================
-        // ⚠️ LATLONG.AI CONFIGURATION
+        // 1. CONFIGURATION & GLOBAL STATE
         // =========================================================================
-
-        // 1. Latlong.ai API Key/Token: (Provided by the user)
-        const LATLONG_API_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJUb2tlbklEIjoiMzNmMjY3MTgtMjRiOC00NTFlLWJlMGYtOGZmMzA1ZDI3ZDk5IiwiQ2xpZW50SUQiOiI2YTA3ZDNkMC01MTNkLTRjMTMtYjRjMi04NTdiY2YzNDJiNWIiLCJCdW5pdElEIjozMCwiQXBwTmFtZSI6InBlcyBoYWNrYXRob24gbWFwcy1yZWltYWdpbmVkIiwiQXBwSUQiOjE4Mzk1LCJUaW1lU3RhbXAiOiIyMDI1LTExLTI4IDE3OjEyOjUyIiwiZXhwIjoxNzY0NTIyNzcyfQ.q5AqBLmiB3KlPMt58O5N767uBJ6qNxGmt6X2aYWtrbI"; 
         
-        // Base URLs for Latlong.ai APIs
-        const LATLONG_BASE_URL = "https://apihub.latlong.ai/v4";
-        const GEOCODE_URL = `${LATLONG_BASE_URL}/geocode.json`;
-        const DISTANCE_MATRIX_URL = `${LATLONG_BASE_URL}/distance_matrix.json`;
-        const LANDMARK_URL = `${LATLONG_BASE_URL}/landmarks.json`;
-
-        // 2. Firebase Configuration (Retained for group/profile state management)
-        const YOUR_FALLBACK_CONFIG = {
-            apiKey: "AIzaSyBr2D6zEFX3u1wQTXE8aTgHFw5EeIUnsPE",
-            authDomain: "html-9bee0.firebaseapp.com",
-            projectId: "html-9bee0",
-            storageBucket: "html-9bee0.firebasestorage.app",
-            messagingSenderId: "893745664576",
-            appId: "1893745664576web1e74ae24e1c9e9bba685a6",
-            measurementId: "G-9DYC404SP0"
+        // --- Firebase Config (REPLACE WITH YOUR ACTUAL CONFIG) ---
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
         };
-        const firebaseConfig = YOUR_FALLBACK_CONFIG;
-        const APP_ID = 'meetup-party-planner-latlong';
-        // =========================================================================
-        // END CONFIGURATION
-        // =========================================================================
 
+        // --- Latlong.ai API Configuration ---
+        const LATLONG_API_TOKEN = 'YOUR_LATLONG_API_TOKEN'; // Securely load this token
+        const GEOCODE_URL = 'https://api.latlong.ai/geocode';
+        const DISTANCE_URL = 'https://api.latlong.ai/distance-matrix';
+        const LANDMARK_URL = 'https://api.latlong.ai/landmarks';
+        
+        // --- Global State Variables ---
+        let db;
+        let auth;
+        let userId = null;
+        let userProfile = null;
+        let currentGroupId = null;
+        let groupUnsubscribe = null;
+        let map = null;
+        let markers = L.layerGroup(); 
+        let isAuthReady = false;
 
-        // GLOBAL STATE & DOM REFERENCES
-        let db, auth, userId = 'anonymous', isAuthReady = false, userProfile = null;
-        let currentGroupId = null, groupUnsubscribe = null;
-        let map = null; // Variable to hold the Leaflet map instance
+        // --- Firestore Paths ---
+        const PROFILE_COLLECTION_PATH = 'user_profiles';
+        const GROUP_COLLECTION_PATH = 'meetup_groups';
 
-        const VIEWS = { loading: document.getElementById('initial-loading'), profile: document.getElementById('view-profile'), main: document.getElementById('view-main'), create: document.getElementById('view-create'), join: document.getElementById('view-join'), session: document.getElementById('view-session') };
-        const PROFILE_FORM = document.getElementById('profile-form');
-        const HOME_LOCALITY_INPUT = document.getElementById('home-locality');
-        const PROFILE_NAME_INPUT = document.getElementById('profile-name');
-        const SAVE_PROFILE_BTN = document.getElementById('save-profile-btn');
-        const PROFILE_BUTTON_TEXT = document.getElementById('profile-button-text');
-        const PROFILE_LOADING_INDICATOR = document.getElementById('profile-loading-indicator');
+        // --- DOM Elements ---
+        const APP_CONTAINER = document.getElementById('app-container');
+        const LOADING_SPINNER = document.getElementById('loading-spinner');
+        const STATUS_CONTAINER = document.getElementById('status-container');
+        const STATUS_MESSAGE = document.getElementById('status-message');
         const USER_DISPLAY_NAME = document.getElementById('user-display-name');
-        const OCCASION_CREATE = document.getElementById('occasion-create');
+        const GO_TO_PROFILE_BTN = document.getElementById('go-to-profile-btn');
+
+        // Views
+        const PROFILE_VIEW = document.getElementById('profile-view');
+        const CREATE_JOIN_VIEW = document.getElementById('create-join-view');
+        const SESSION_VIEW = document.getElementById('session-view');
+
+        // Profile Form Elements
+        const PROFILE_FORM = document.getElementById('profile-form');
+        const PROFILE_NAME_INPUT = document.getElementById('profile-name-input');
+        const HOME_LOCALITY_INPUT = document.getElementById('home-locality-input');
+        const SAVE_PROFILE_BTN = document.getElementById('save-profile-btn');
+
+        // Create/Join Elements
         const CREATE_GROUP_BTN = document.getElementById('create-group-btn');
         const JOIN_BY_CODE_BTN = document.getElementById('join-by-code-btn');
         const JOIN_CODE_INPUT = document.getElementById('join-code-input');
-        const CALCULATE_BTN = document.getElementById('calculate-btn');
-        const SESSION_JOIN_CODE = document.getElementById('session-join-code');
-        const COPY_CODE_BTN = document.getElementById('copy-code-btn');
-        const PARTICIPANTS_LIST = document.getElementById('participants-list');
-        const PARTICIPANT_COUNT = document.getElementById('participant-count');
-        const SESSION_OCCASION = document.getElementById('session-occasion');
-        const END_SESSION_BTN = document.getElementById('end-session-btn');
-        const GO_TO_PROFILE_BTN = document.getElementById('go-to-profile');
-        const RESULTS_SECTION = document.getElementById('results-section');
-        const RECOMMENDATIONS_LIST = document.getElementById('recommendations-list');
-        const STATUS_MESSAGE = document.getElementById('status-message');
-        const BUTTON_TEXT = document.getElementById('button-text');
-        const LOADING_INDICATOR = document.getElementById('loading-indicator');
+        const OCCASION_CREATE = document.getElementById('occasion-create');
         const SHOW_CREATE_BTN = document.getElementById('show-create-btn');
         const SHOW_JOIN_BTN = document.getElementById('show-join-btn');
+        const CREATE_GROUP_SECTION = document.getElementById('create-group-section');
+        const JOIN_GROUP_SECTION = document.getElementById('join-group-section');
 
+        // Session Elements
+        const SESSION_JOIN_CODE = document.getElementById('session-join-code');
+        const PARTICIPANT_COUNT = document.getElementById('participant-count');
+        const PARTICIPANTS_LIST = document.getElementById('participants-list');
+        const CALCULATE_BTN = document.getElementById('calculate-btn');
+        const END_SESSION_BTN = document.getElementById('end-session-btn');
+        const COPY_CODE_BTN = document.getElementById('copy-code-btn');
+        const SESSION_OCCASION = document.getElementById('session-occasion');
 
-        // FIXED PATHS
-        const PROFILE_COLLECTION_PATH = `artifacts/${APP_ID}/users`;
-        const GROUP_COLLECTION_PATH = `artifacts/${APP_ID}/groups`;
+        // Results Elements
+        const RESULTS_SECTION = document.getElementById('results-section');
+        const RECOMMENDATIONS_LIST = document.getElementById('recommendations-list');
+
+        // Firebase Imports
+        const { initializeApp } = firebase;
+        const { getFirestore, doc, getDoc, setDoc, updateDoc, addDoc, collection, query, where, getDocs, onSnapshot, arrayUnion, deleteDoc } = firebase.firestore;
+        const { getAuth, signInAnonymously, onAuthStateChanged } = firebase.auth;
 
         // =========================================================================
-        // UTILITY FUNCTIONS
+        // 2. UTILITY FUNCTIONS (Omitted in prompt, defined here)
         // =========================================================================
-
-        function showStatus(message, isError = false) {
-            STATUS_MESSAGE.textContent = message;
-            STATUS_MESSAGE.className = `mt-4 p-3 rounded-lg ${isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`;
-            STATUS_MESSAGE.classList.remove('hidden');
-            // Keep error messages visible longer
-            const timeout = isError ? 10000 : 5000;
-            setTimeout(() => STATUS_MESSAGE.classList.add('hidden'), timeout);
-        }
 
         function setView(mainView, subView = null) {
-            Object.values(VIEWS).forEach(v => v.classList.add('hidden'));
-            if (VIEWS[mainView]) VIEWS[mainView].classList.remove('hidden');
+            APP_CONTAINER.classList.remove('hidden');
+            LOADING_SPINNER.classList.add('hidden');
+
+            PROFILE_VIEW.classList.add('hidden');
+            CREATE_JOIN_VIEW.classList.add('hidden');
+            SESSION_VIEW.classList.add('hidden');
             
-            if (mainView === 'main') {
-                document.getElementById('view-create').classList.add('hidden');
-                document.getElementById('view-join').classList.add('hidden');
-                document.getElementById('view-session').classList.add('hidden');
-                if (VIEWS[subView]) VIEWS[subView].classList.remove('hidden');
-                updateTabButtons(subView === 'join');
+            if (mainView === 'profile') {
+                PROFILE_VIEW.classList.remove('hidden');
+            } else if (mainView === 'main') {
+                if (subView === 'session') {
+                    SESSION_VIEW.classList.remove('hidden');
+                } else {
+                    CREATE_JOIN_VIEW.classList.remove('hidden');
+                    CREATE_GROUP_SECTION.classList.toggle('hidden', subView === 'join');
+                    JOIN_GROUP_SECTION.classList.toggle('hidden', subView === 'create');
+                }
             }
         }
-        
-        function updateTabButtons(isJoinView) {
-            if (isJoinView) {
-                SHOW_CREATE_BTN.className = 'flex-1 py-2 font-medium rounded-lg transition-colors border-b-2 border-gray-300 text-gray-700 hover:bg-gray-100';
-                SHOW_JOIN_BTN.className = 'flex-1 py-2 font-medium rounded-lg transition-colors border-b-4 border-pink-500 text-pink-700 bg-pink-100 shadow-md';
+
+        function showStatus(message, isError) {
+            STATUS_MESSAGE.textContent = message;
+            STATUS_CONTAINER.classList.remove('hidden', 'bg-red-100', 'text-red-800', 'bg-indigo-100', 'text-indigo-800');
+            if (isError) {
+                STATUS_CONTAINER.classList.add('bg-red-100', 'text-red-800');
+                console.error(message);
             } else {
-                SHOW_CREATE_BTN.className = 'flex-1 py-2 font-medium rounded-lg transition-colors border-b-4 border-indigo-500 text-indigo-700 bg-indigo-100 shadow-md';
-                SHOW_JOIN_BTN.className = 'flex-1 py-2 font-medium rounded-lg transition-colors border-b-2 border-gray-300 text-gray-700 hover:bg-gray-100';
+                STATUS_CONTAINER.classList.add('bg-indigo-100', 'text-indigo-800');
+                console.log(message);
             }
         }
 
-        function formatDistance(meters, isRouted = true) {
-            const suffix = isRouted ? '' : ' (Straight Line)';
-            if (meters === Infinity) return 'N/A';
-            if (meters < 1000) return `${Math.round(meters)} m${suffix}`;
-            return `${(meters / 1000).toFixed(1)} km${suffix}`;
-        }
+        function setButtonLoading(isLoading, button = null) {
+            const btn = button || CALCULATE_BTN;
+            if (!btn) return;
+            
+            btn.disabled = isLoading;
+            const originalText = btn.dataset.originalText || btn.textContent;
 
-        function formatTime(seconds) {
-            if (seconds === Infinity) return 'N/A';
-            const minutes = Math.floor(seconds / 60);
-            const hours = Math.floor(minutes / 60);
-            const remainingMinutes = minutes % 60;
-
-            let result = '';
-            if (hours > 0) result += `${hours} hr `;
-            if (remainingMinutes > 0 || hours === 0) result += `${remainingMinutes} min`;
-            return result.trim();
+            if (isLoading) {
+                btn.dataset.originalText = originalText;
+                btn.innerHTML = `<svg class="animate-spin h-5 w-5 mr-3" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4V2a10 10 0 00-7.07 17.07l1.41-1.41A8 8 0 0112 4z"/></svg> Processing...`;
+                btn.classList.add('flex', 'items-center', 'justify-center');
+            } else {
+                btn.textContent = originalText;
+                btn.classList.remove('flex', 'items-center', 'justify-center');
+            }
         }
 
         function generateGroupCode() {
-            const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
             let code = '';
-            for (let i = 0; i < 6; i++) {
-                code += characters.charAt(Math.floor(Math.random() * characters.length));
+            for (let i = 0; i < 4; i++) {
+                code += chars.charAt(Math.floor(Math.random() * chars.length));
             }
             return code;
         }
 
         function copyToClipboard(text) {
             navigator.clipboard.writeText(text).then(() => {
-                showStatus('Code copied to clipboard!', false);
+                showStatus(`Copied code ${text} to clipboard!`, false);
             }).catch(err => {
                 console.error('Could not copy text: ', err);
                 showStatus('Failed to copy code.', true);
             });
         }
-        
-        function setButtonLoading(isLoading, buttonRef = CALCULATE_BTN) {
-            if (buttonRef === CALCULATE_BTN) {
-                CALCULATE_BTN.disabled = isLoading || (parseInt(PARTICIPANT_COUNT.textContent) < 2);
-                BUTTON_TEXT.textContent = isLoading ? 'Calculating...' : 'Find Optimal Center & Real-World Landmarks';
-                LOADING_INDICATOR.classList.toggle('hidden', !isLoading);
-            } else if (buttonRef === SAVE_PROFILE_BTN) {
-                SAVE_PROFILE_BTN.disabled = isLoading;
-                PROFILE_BUTTON_TEXT.textContent = isLoading ? 'Saving...' : 'Save Profile & Continue';
-                PROFILE_LOADING_INDICATOR.classList.toggle('hidden', !isLoading);
-            } else if (buttonRef === CREATE_GROUP_BTN) {
-                CREATE_GROUP_BTN.disabled = isLoading;
-                CREATE_GROUP_BTN.textContent = isLoading ? 'Creating...' : 'Create Group & Get Code';
-            } else if (buttonRef === JOIN_BY_CODE_BTN) {
-                JOIN_BY_CODE_BTN.disabled = isLoading;
-                JOIN_BY_CODE_BTN.textContent = isLoading ? 'Joining...' : 'Join Group';
-            }
-        }
-        
-        // --- Map Visualization Functions ---
 
-        function initMap(centerLat, centerLon) {
-            // Check if L (Leaflet) is defined before calling its functions
-            if (typeof L === 'undefined') {
-                console.error("Leaflet library (L) is not defined.");
-                return;
+        function formatDistance(meters, isRouted) {
+            if (!isRouted) {
+                return `${(meters / 1000).toFixed(2)} km (Straight-line)`;
             }
+            if (meters < 1000) {
+                return `${meters.toFixed(0)} m`;
+            }
+            return `${(meters / 1000).toFixed(2)} km`;
+        }
+
+        function formatTime(seconds) {
+            if (seconds === Infinity) return 'N/A';
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            
+            if (hours > 0) {
+                return `${hours}h ${minutes}m`;
+            }
+            return `${minutes} min`;
+        }
+
+        // --- Leaflet Map Functions ---
+
+        function initMap(lat, lon) {
             if (map) {
                 map.remove();
             }
-            map = L.map('map-container').setView([centerLat, centerLon], 10);
+            map = L.map('map').setView([lat, lon], 13);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             }).addTo(map);
+            markers.addTo(map);
+            markers.clearLayers(); 
         }
 
-        function addMarker(lat, lon, popupText, iconType = 'default') {
-            if (typeof L === 'undefined') return;
+        function addMarker(lat, lon, popupText, type) {
+            let color;
+            let size = 30;
 
-            // Using different color classes for better map visualization
-            let markerColor = iconType === 'center' ? 'red' : (iconType === 'landmark' ? 'blue' : 'green');
-            
-            // Custom Icon for better visual
-            let iconHtml = '📍';
-            if (iconType === 'center') iconHtml = '⭐';
-            else if (iconType === 'origin') iconHtml = '🏠';
+            if (type === 'origin') {
+                color = '#ef4444'; // Red
+            } else if (type === 'center') {
+                color = '#4f46e5'; // Indigo (Centroid)
+                size = 36;
+            } else {
+                color = '#10b981'; // Green (Landmark)
+            }
 
-            // CORRECTED: Ensure L.DivIcon is used correctly with the class defined in CSS
-            let markerIcon = L.divIcon({
-                className: `custom-div-icon bg-${markerColor}-600 rounded-full w-6 h-6 text-white text-base text-center shadow-xl font-bold`,
-                html: iconHtml,
-                iconSize: [24, 24], // Set size
-                iconAnchor: [12, 24] // Set anchor to the bottom center (for pointer effect)
+            const customIcon = L.divIcon({
+                className: `custom-div-icon ${type}-marker`,
+                html: `<div style="background-color: ${color}; width: ${size}px; height: ${size}px; border-radius: 50%; display: flex; justify-content: center; align-items: center;"></div>`,
+                iconSize: [size, size],
+                iconAnchor: [size / 2, size]
             });
 
-            const marker = L.marker([lat, lon], {icon: markerIcon}).addTo(map);
-            marker.bindPopup(popupText, { closeButton: false, autoClose: false }).openPopup(); 
-            return marker;
+            const marker = L.marker([lat, lon], {icon: customIcon})
+                .bindPopup(popupText, { closeButton: false, autoClose: false })
+                .openPopup();
+            
+            markers.addLayer(marker);
         }
 
-
         // =========================================================================
-        // LATLONG.AI API FUNCTIONS
+        // 3. LATLONG.AI API WRAPPERS (Part 1 & 2)
         // =========================================================================
 
         async function geocodeAddress(address) {
-            // FIX APPLIED: Uses 'address' exactly as provided by user (Pin Code + City)
-            const addressWithContext = address; 
-            const endpoint = `${GEOCODE_URL}?address=${encodeURIComponent(addressWithContext)}`;
-            
+            const endpoint = `${GEOCODE_URL}?address=${encodeURIComponent(address)}`;
             try {
                 const response = await fetch(endpoint, {
                     method: 'GET',
                     headers: { 'X-Authorization-Token': LATLONG_API_TOKEN }
                 });
-                
+
                 if (!response.ok) {
-                    const errorBody = await response.text();
-                    console.error(`Latlong Geocoding HTTP Error ${response.status}:`, errorBody);
-                    throw new Error(`API Geocoding failed: HTTP ${response.status}. Check API token or network.`);
+                    console.error(`Latlong Geocoding HTTP Error ${response.status}`);
+                    return null;
                 }
                 
                 const data = await response.json();
 
-                if (data.status === 'success' && data.data && data.data.latitude) {
-                    return { lat: parseFloat(data.data.latitude), lon: parseFloat(data.data.longitude) };
+                if (data.status === 'success' && data.data.latitude && data.data.longitude) {
+                    return {
+                        lat: parseFloat(data.data.latitude),
+                        lon: parseFloat(data.data.longitude)
+                    };
                 }
                 
-                const errorMessage = data.message || data.status || 'Unknown Geocoding error';
-                console.error(`Latlong Geocoding failed for ${address}:`, errorMessage, data);
-                throw new Error(data.message || 'Could not find coordinates for the provided address.');
+                console.warn('Latlong Geocoding failed:', data.message || data.status);
+                return null;
             } catch (error) {
-                console.error('Network or parsing error during Geocoding:', error);
-                if (error.message.startsWith('API Geocoding failed')) throw error;
-                throw new Error(`Network error during geocoding: ${error.message}`);
+                console.error('Network or parsing error during geocoding:', error);
+                return null;
             }
         }
 
-        async function getDistanceMatrix(origins, destinations, profile = 'driving') {
-            const endpoint = `${DISTANCE_MATRIX_URL}?origins=${origins}&destinations=${destinations}&profile=${profile}`;
+        async function getDistanceMatrix(origin, destination, mode = 'driving') {
+            const endpoint = `${DISTANCE_URL}?origins=${origin}&destinations=${destination}&mode=${mode}`; 
             
             try {
                 const response = await fetch(endpoint, {
@@ -460,20 +470,21 @@
 
                 if (!response.ok) {
                     console.error(`Latlong Distance Matrix HTTP Error ${response.status}`);
-                    return { distance: Infinity, duration: Infinity, status: `HTTP_ERROR_${response.status}` };
+                    return { distance: Infinity, duration: Infinity, status: 'HTTP_ERROR' };
                 }
-
+                
                 const data = await response.json();
 
-                if (data.status === 'success' && data.data && data.data.rows && data.data.rows[0].elements[0].status === 'OK') {
+                if (data.status === 'success' && data.data?.rows[0]?.elements[0]?.status === 'OK') {
                     const element = data.data.rows[0].elements[0];
-                    return { 
-                        distance: element.distance.value, // meters (Routed Distance)
-                        duration: element.duration.value, // seconds
+                    return {
+                        distance: element.distance.value, // in meters
+                        duration: element.duration.value, // in seconds
                         status: 'OK'
                     };
                 }
                 
+                // Handle API error or non-OK status
                 const status = data.data?.rows[0]?.elements[0]?.status || data.message || 'ERROR';
                 const errorStatus = (status === 'ZERO_RESULTS' || status === 'NOT_FOUND') ? 'ROUTE_NOT_FOUND' : status;
                 
@@ -519,7 +530,7 @@
             }
         }
         
-        // --- Haversine and Center Calculation Utilities ---
+        // --- Haversine and Center Calculation Utilities (Part 2) ---
 
         function haversineDistance(lat1, lon1, lat2, lon2) {
             // Implements Haversine distance in meters
@@ -530,8 +541,8 @@
             const Δλ = (lon2-lon1) * Math.PI/180;
 
             const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-                      Math.cos(φ1) * Math.cos(φ2) *
-                      Math.sin(Δλ/2) * Math.sin(Δλ/2);
+                        Math.cos(φ1) * Math.cos(φ2) *
+                        Math.sin(Δλ/2) * Math.sin(Δλ/2);
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 
             return R * c; // in metres
@@ -572,7 +583,7 @@
 
 
         // =========================================================================
-        // CORE CALCULATION LOGIC
+        // 4. CORE CALCULATION LOGIC (Part 2)
         // =========================================================================
 
         async function findOptimalMeetupLocation() {
@@ -715,7 +726,7 @@
             }
         }
         
-        // --- Display Functions ---
+        // --- Display Functions (Part 2) ---
 
         function displayResults(results, validParticipants) {
             RECOMMENDATIONS_LIST.innerHTML = '';
@@ -814,8 +825,9 @@
             `;
         }
 
+
         // =========================================================================
-        // FIREBASE/AUTH/GROUP LISTENERS (State Management) - Omitted for brevity (unchanged)
+        // 5. FIREBASE & GROUP MANAGEMENT LOGIC (Part 2 & 3)
         // =========================================================================
         
         async function loadUserProfile() {
@@ -881,7 +893,6 @@
                 setButtonLoading(false, SAVE_PROFILE_BTN);
             }
         }
-
 
         async function createGroup() {
             setButtonLoading(true, CREATE_GROUP_BTN);
@@ -983,6 +994,10 @@
         }
 
         function handleGroupSnapshot(docSnapshot) {
+            if (map) map.remove(); // Clear the map on any new data load
+            markers.clearLayers();
+            RESULTS_SECTION.classList.add('hidden'); // Hide old results
+
             if (!docSnapshot.exists()) {
                 currentGroupId = null;
                 userProfile.currentGroupId = null;
@@ -1040,7 +1055,10 @@
         }
 
 
-        // --- Event Listeners Setup ---
+        // =========================================================================
+        // 6. INITIALIZATION & EVENT LISTENERS
+        // =========================================================================
+
         function setupListeners() {
             PROFILE_FORM.addEventListener('submit', saveProfile);
             GO_TO_PROFILE_BTN.addEventListener('click', () => setView('profile'));
@@ -1055,10 +1073,6 @@
             
             CALCULATE_BTN.addEventListener('click', findOptimalMeetupLocation);
         }
-
-        // =========================================================================
-        // FIREBASE INIT
-        // =========================================================================
 
         document.addEventListener('DOMContentLoaded', async () => {
             try {
