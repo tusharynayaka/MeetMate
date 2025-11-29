@@ -186,10 +186,10 @@
         import { getFirestore, doc, getDoc, setDoc, addDoc, collection, onSnapshot, updateDoc, arrayUnion, query, where, getDocs, deleteDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
         // =========================================================================
-        // ⚠️ START CONFIGURATION: YOUR TOKEN IS EMBEDDED HERE
+        // ⚠️ LATLONG.AI CONFIGURATION
         // =========================================================================
 
-        // 1. Latlong.ai API Key/Token: **REQUIRED**
+        // 1. Latlong.ai API Key/Token: (Provided by the user)
         const LATLONG_API_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJUb2tlbklEIjoiMzNmMjY3MTgtMjRiOC00NTFlLWJlMGYtOGZmMzA1ZDI3ZDk5IiwiQ2xpZW50SUQiOiI2YTA3ZDNkMC01MTNkLTRjMTMtYjRjMi04NTdiY2YzNDJiNWIiLCJCdW5pdElEIjozMCwiQXBwTmFtZSI6InBlcyBoYWNrYXRob24gbWFwcy1yZWltYWdpbmVkIiwiQXBwSUQiOjE4Mzk1LCJUaW1lU3RhbXAiOiIyMDI1LTExLTI4IDE3OjEyOjUyIiwiZXhwIjoxNzY0NTIyNzcyfQ.q5AqBLmiB3KlPMd58O5N767uBJ6qNxGmt6X2aYWtrbI"; 
         
         // Base URLs for Latlong.ai APIs
@@ -211,7 +211,7 @@
         const firebaseConfig = YOUR_FALLBACK_CONFIG;
         const APP_ID = 'meetup-party-planner-latlong';
         // =========================================================================
-        // ⚠️ END CONFIGURATION
+        // END CONFIGURATION
         // =========================================================================
 
 
@@ -251,7 +251,10 @@
         const PROFILE_COLLECTION_PATH = `artifacts/${APP_ID}/users`;
         const GROUP_COLLECTION_PATH = `artifacts/${APP_ID}/groups`;
 
-        // Utility Functions
+        // =========================================================================
+        // UTILITY FUNCTIONS
+        // =========================================================================
+
         function showStatus(message, isError = false) {
             STATUS_MESSAGE.textContent = message;
             STATUS_MESSAGE.className = `mt-4 p-3 rounded-lg ${isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`;
@@ -317,9 +320,29 @@
                 showStatus('Failed to copy code.', true);
             });
         }
+        
+        function setButtonLoading(isLoading, buttonRef = CALCULATE_BTN) {
+            if (buttonRef === CALCULATE_BTN) {
+                CALCULATE_BTN.disabled = isLoading || (parseInt(PARTICIPANT_COUNT.textContent) < 2);
+                BUTTON_TEXT.textContent = isLoading ? 'Calculating...' : 'Find Optimal Center & Real-World Landmarks';
+                LOADING_INDICATOR.classList.toggle('hidden', !isLoading);
+            } else if (buttonRef === SAVE_PROFILE_BTN) {
+                SAVE_PROFILE_BTN.disabled = isLoading;
+                PROFILE_BUTTON_TEXT.textContent = isLoading ? 'Saving...' : 'Save Profile & Continue';
+                PROFILE_LOADING_INDICATOR.classList.toggle('hidden', !isLoading);
+            } else if (buttonRef === CREATE_GROUP_BTN) {
+                CREATE_GROUP_BTN.disabled = isLoading;
+                CREATE_GROUP_BTN.textContent = isLoading ? 'Creating...' : 'Create Group & Get Code';
+            } else if (buttonRef === JOIN_BY_CODE_BTN) {
+                JOIN_BY_CODE_BTN.disabled = isLoading;
+                JOIN_BY_CODE_BTN.textContent = isLoading ? 'Joining...' : 'Join Group';
+            }
+        }
 
 
-        // --- Latlong.ai API Functions ---
+        // =========================================================================
+        // LATLONG.AI API FUNCTIONS
+        // =========================================================================
 
         async function geocodeAddress(address) {
             const endpoint = `${GEOCODE_URL}?address=${encodeURIComponent(address)}`;
@@ -417,7 +440,9 @@
         }
 
 
-        // --- Core Calculation Logic ---
+        // =========================================================================
+        // CORE CALCULATION LOGIC
+        // =========================================================================
 
         async function findOptimalMeetupLocation() {
             setButtonLoading(true);
@@ -435,7 +460,7 @@
             const groupData = groupSnapshot.data();
             const participants = groupData.participants || [];
 
-            // 1. Ensure all participants have coordinates and use them
+            // 1. Validate participant coordinates
             const validParticipants = participants.filter(p => p.lat && p.lon);
             if (validParticipants.length < 2) {
                 showStatus('Error: Need at least 2 participants with valid addresses to calculate the center. Please re-save profiles.', true);
@@ -470,68 +495,50 @@
 
             // 3. Calculate Distance Matrix for all potential locations
             
-            const originCoordinates = validParticipants.map(p => `${p.lat},${p.lon}`).join('|');
             const results = [];
 
             for (let i = 0; i < potentialLocations.length; i++) {
                 const location = potentialLocations[i];
                 const destinationCoordinate = `${location.lat},${location.lon}`;
                 
-                // Get Distance Matrix for the whole group to this single location
-                const matrixResult = await getDistanceMatrix(originCoordinates, destinationCoordinate, 'driving');
+                let locationTotalDistance = 0;
+                let locationMaxDuration = 0;
+                let validLocation = true;
+                const travelDetails = [];
                 
-                if (matrixResult.status === 'OK') {
-                    const travelDetails = [];
-                    let totalDistance = 0;
-                    let maxDuration = 0;
+                // For each potential location, calculate distance from ALL origins (one at a time)
+                for (let j = 0; j < validParticipants.length; j++) {
+                    const p = validParticipants[j];
+                    const singleOrigin = `${p.lat},${p.lon}`;
 
-                    // Assuming Distance Matrix returns rows corresponding to origins
-                    // Note: Latlong's Distance Matrix result structure is typically an array of rows, 
-                    // where each row corresponds to an origin. Since we passed N origins and 1 destination,
-                    // we expect N results in the first row's elements array (if the API supports multiple origins in one call).
-                    // **Since the Latlong.ai API call pattern is for origins|destinations, we will simplify the calculation assuming N origins to 1 destination is supported and flatten the results.**
+                    const singleResult = await getDistanceMatrix(singleOrigin, destinationCoordinate, 'driving');
                     
-                    // For robustness, let's stick to the previous loop logic: one participant (origin) at a time
-                    
-                    let locationTotalDistance = 0;
-                    let locationMaxDuration = 0;
-                    let validLocation = true;
-                    
-                    for (let j = 0; j < validParticipants.length; j++) {
-                        const p = validParticipants[j];
-                        const singleOrigin = `${p.lat},${p.lon}`;
+                    if (singleResult.status === 'OK') {
+                        locationTotalDistance += singleResult.distance;
+                        locationMaxDuration = Math.max(locationMaxDuration, singleResult.duration);
 
-                        const singleResult = await getDistanceMatrix(singleOrigin, destinationCoordinate, 'driving');
-                        
-                        if (singleResult.status === 'OK') {
-                            locationTotalDistance += singleResult.distance;
-                            locationMaxDuration = Math.max(locationMaxDuration, singleResult.duration);
-
-                            travelDetails.push({
-                                displayName: p.displayName,
-                                distance: singleResult.distance,
-                                duration: singleResult.duration
-                            });
-                        } else {
-                            validLocation = false;
-                            travelDetails.push({ displayName: p.displayName, distance: Infinity, duration: Infinity });
-                        }
-                    }
-
-                    if (validLocation) {
-                        results.push({
-                            rank: 0, // Placeholder, assigned later
-                            placeName: location.name,
-                            exactAddress: `${location.lat.toFixed(5)}, ${location.lon.toFixed(5)}`,
-                            totalDistance: locationTotalDistance,
-                            maxDuration: locationMaxDuration,
-                            travelDetails: travelDetails
+                        travelDetails.push({
+                            displayName: p.displayName,
+                            distance: singleResult.distance,
+                            duration: singleResult.duration
                         });
+                    } else {
+                        validLocation = false;
+                        travelDetails.push({ displayName: p.displayName, distance: Infinity, duration: Infinity });
+                        // Optimization: if one participant cannot reach, skip location entirely
+                        break; 
                     }
+                }
 
-                } else if (location.name.includes('Theoretical')) {
-                    // This is the fallback for the theoretical center if the single API call failed
-                    showStatus(`Warning: Failed to calculate distance matrix for the Geometric Center. Skipping.`, true);
+                if (validLocation) {
+                    results.push({
+                        rank: 0, // Placeholder, assigned later
+                        placeName: location.name,
+                        exactAddress: `${location.lat.toFixed(5)}, ${location.lon.toFixed(5)}`,
+                        totalDistance: locationTotalDistance,
+                        maxDuration: locationMaxDuration,
+                        travelDetails: travelDetails
+                    });
                 }
             }
 
@@ -575,23 +582,22 @@
                                 ${index + 1}. ${location.placeName}
                                 ${index === 0 ? '<span class="isochrone-badge bg-green-500">BEST ACCESS</span>' : ''}
                             </h3>
-                            <p class="text-sm font-semibold text-gray-500">Total Travel: <span class="font-bold text-lg text-indigo-500">${formatDistance(location.totalDistance)}</span></p>
-                        </div>
-                        <p class="text-gray-600 mb-4 text-sm">Worst-case travel time: **${formatTime(location.maxDuration)}** (The longest journey to the spot).</p>
+                            <p class="text-gray-600 mb-4 text-sm">Worst-case travel time: **${formatTime(location.maxDuration)}** (The longest journey to the spot).</p>
                         
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full travel-table border border-gray-200 rounded-lg">
-                                <thead>
-                                    <tr>
-                                        <th class="rounded-tl-lg">Participant</th>
-                                        <th>Distance</th>
-                                        <th class="rounded-tr-lg">Time (Driving)</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${detailsHtml}
-                                </tbody>
-                            </table>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full travel-table border border-gray-200 rounded-lg">
+                                    <thead>
+                                        <tr>
+                                            <th class="rounded-tl-lg">Participant</th>
+                                            <th>Distance</th>
+                                            <th class="rounded-tr-lg">Time (Driving)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${detailsHtml}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -604,13 +610,9 @@
             `;
         }
 
-        function setButtonLoading(isLoading) {
-            CALCULATE_BTN.disabled = isLoading || (parseInt(PARTICIPANT_COUNT.textContent) < 2);
-            BUTTON_TEXT.textContent = isLoading ? 'Calculating...' : 'Find Optimal Center & Real-World Landmarks';
-            LOADING_INDICATOR.classList.toggle('hidden', !isLoading);
-        }
-
-        // --- Firebase/Auth/Group Listeners (Authentication and State Management) ---
+        // =========================================================================
+        // FIREBASE/AUTH/GROUP LISTENERS (State Management)
+        // =========================================================================
         
         async function loadUserProfile() {
             const userDocRef = doc(db, PROFILE_COLLECTION_PATH, userId);
@@ -643,7 +645,7 @@
             }
 
             try {
-                showStatus('Verifying address...', false);
+                showStatus('Verifying address via Latlong.ai Geocoding...', false);
                 const coords = await geocodeAddress(homeLocality);
 
                 if (!coords) {
@@ -669,24 +671,6 @@
                 showStatus(`Error saving profile: ${error.message}`, true);
             } finally {
                 setButtonLoading(false, SAVE_PROFILE_BTN);
-            }
-        }
-        
-        function setButtonLoading(isLoading, buttonRef = CALCULATE_BTN) {
-            if (buttonRef === CALCULATE_BTN) {
-                CALCULATE_BTN.disabled = isLoading || (parseInt(PARTICIPANT_COUNT.textContent) < 2);
-                BUTTON_TEXT.textContent = isLoading ? 'Calculating...' : 'Find Optimal Center & Real-World Landmarks';
-                LOADING_INDICATOR.classList.toggle('hidden', !isLoading);
-            } else if (buttonRef === SAVE_PROFILE_BTN) {
-                SAVE_PROFILE_BTN.disabled = isLoading;
-                PROFILE_BUTTON_TEXT.textContent = isLoading ? 'Saving...' : 'Save Profile & Continue';
-                PROFILE_LOADING_INDICATOR.classList.toggle('hidden', !isLoading);
-            } else if (buttonRef === CREATE_GROUP_BTN) {
-                CREATE_GROUP_BTN.disabled = isLoading;
-                CREATE_GROUP_BTN.textContent = isLoading ? 'Creating...' : 'Create Group & Get Code';
-            } else if (buttonRef === JOIN_BY_CODE_BTN) {
-                JOIN_BY_CODE_BTN.disabled = isLoading;
-                JOIN_BY_CODE_BTN.textContent = isLoading ? 'Joining...' : 'Join Group';
             }
         }
 
@@ -852,10 +836,11 @@
             CALCULATE_BTN.addEventListener('click', findOptimalMeetupLocation);
         }
 
+        // =========================================================================
         // FIREBASE INIT
+        // =========================================================================
+
         document.addEventListener('DOMContentLoaded', async () => {
-            // No API key check needed here since the key is now hardcoded.
-            
             try {
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
@@ -872,9 +857,10 @@
                 });
             } catch (error) {
                 console.error('Firebase Error:', error);
-                showStatus(`Firebase failed: ${error.message}`, true);
+                showStatus(`Firebase failed: ${error.message}. App will function for single user only.`, true);
                 isAuthReady = true;
-                setView('main', 'create');
+                // Fallback view if Firebase fails to load
+                setView('profile');
             }
         });
 
