@@ -536,9 +536,9 @@
                     sumChar += localityKey.charCodeAt(i);
                 }
                 
-                // Use the sum to create a larger, distinct offset (between 0.1 and 1.5 degrees, approx 11-166 km).
-                const latOffset = (sumChar % 100) / 100.0; // 0.0 to 0.99
-                const lonOffset = (sumChar % 100) / 100.0 + (localityKey.length / 50.0); // 0.0 to 1.0+
+                // --- FINAL FIX: Use a large offset to guarantee separation (1 to 10 degrees) ---
+                const latOffset = (sumChar % 10) + 1.0; // 1.0 to 10.0 degrees offset
+                const lonOffset = (sumChar % 10) + 1.0 + (localityKey.length * 0.1); // Slightly different offset for lon
                 
                 // Base coordinates (Bengaluru, India - 12.97, 77.59)
                 // Apply the offset based on hash properties to put points in different quadrants.
@@ -552,8 +552,7 @@
                 const latRad = toRadian(p.lat);
                 const lonRad = toRadian(p.lon);
 
-                // Step 2: Convert Lat/Lon to 3D Cartesian (x, y, z) coordinates
-                x += Math.cos(latRad) * Math.cos(lonRad);
+                // Step 2: Convert Lat/Lon to 3D Cartesian (x, y, z) coordinates                 x += Math.cos(latRad) * Math.cos(lonRad);
                 y += Math.cos(latRad) * Math.sin(lonRad);
                 z += Math.sin(latRad);
             }
