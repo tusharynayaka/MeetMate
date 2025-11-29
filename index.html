@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Collaborative Meetup Party Planner</title>
+    <title>Collaborative Meetup Party Planner (Math-Only)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
@@ -53,8 +53,8 @@
 <body>
     <div class="min-h-screen flex items-start justify-center p-4">
         <div class="container-card p-6 md:p-10 rounded-xl w-full">
-            <h1 class="text-3xl font-bold text-gray-800 mb-2 text-center">Meetup Party Planner</h1>
-            <p class="text-gray-500 text-center mb-6">Create a group, share a code, and find the perfect central spot.</p>
+            <h1 class="text-3xl font-bold text-gray-800 mb-2 text-center">Meetup Party Planner (Math-Only)</h1>
+            <p class="text-gray-500 text-center mb-6">Create a group, share a code, and find the geometric central spot.</p>
 
             <div id="status-message" class="mt-4 p-3 bg-red-100 text-red-700 rounded-lg hidden" role="alert"></div>
 
@@ -164,6 +164,7 @@
         import { getFirestore, setLogLevel, doc, getDoc, setDoc, addDoc, collection, onSnapshot, updateDoc, arrayUnion, query, where, getDocs } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
         // CONFIGURATION SECTION
+        // Default Firebase config is included for basic app functionality (profile storage, group codes)
         const YOUR_FALLBACK_CONFIG = {
             apiKey: "AIzaSyBr2D6zEFX3u1wQTXE8aTgHFw5EeIUnsPE",
             authDomain: "html-9bee0.firebaseapp.com",
@@ -177,14 +178,14 @@
         const firebaseConfig = typeof firebaseconfig !== 'undefined' ? JSON.parse(firebaseconfig) : YOUR_FALLBACK_CONFIG;
         const APP_ID = typeof appid !== 'undefined' ? appid : 'meetup-party-planner-v1';
         
-        // This key is NOT used for calculation in this version but is kept for future AI integration.
-        const GEMINI_API_KEY = "AIzaSyAakNnJjG03PixKLHm9PR7wN24KXkcjDJ0"; 
+        // **NOTICE: GEMINI API KEY IS REMOVED FROM LOGIC**
+        // const GEMINI_API_KEY = "REMOVED"; 
 
         // GLOBAL STATE
         let db, auth, userId = 'anonymous', isAuthReady = false, userProfile = null;
         let currentGroupId = null, groupUnsubscribe = null;
 
-        // DOM REFERENCES
+        // DOM REFERENCES (Omitted for brevity)
         const VIEWS = {
             loading: document.getElementById('initial-loading'),
             profile: document.getElementById('view-profile'),
@@ -222,11 +223,11 @@
         const SHOW_JOIN_BTN = document.getElementById('show-join-btn');
 
 
-        // FIXED PATHS (Gemini API URL is now ignored for the main function)
+        // FIXED PATHS
         const PROFILE_COLLECTION_PATH = `artifacts/${APP_ID}/users`;
         const GROUP_COLLECTION_PATH = `artifacts/${APP_ID}/groups`;
 
-        // FIREBASE INIT
+        // FIREBASE INIT (Standard)
         setLogLevel('error');
         document.addEventListener('DOMContentLoaded', async () => {
             try {
@@ -255,7 +256,7 @@
             }
         });
 
-        // VIEW MANAGEMENT (Standard)
+        // VIEW MANAGEMENT, PROFILE, GROUP FUNCTIONS (Standard)
         function setView(viewName, subView = null) {
             Object.values(VIEWS).forEach(view => view.classList.add('hidden'));
             if (viewName === 'profile') VIEWS.profile.classList.remove('hidden');
@@ -301,7 +302,6 @@
             }
         }
 
-        // PROFILE FUNCTIONS (Standard)
         async function loadUserProfile() {
             if (!db || !isAuthReady) return;
             try {
@@ -353,7 +353,6 @@
             }
         }
 
-        // GROUP FUNCTIONS (Standard)
         function generateJoinCode() {
             const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
             let result = '';
@@ -520,21 +519,28 @@
             return radian * 180 / Math.PI;
         }
 
-        // --- CORE MATHEMATICAL CALCULATION ---
+        // --- CORE MATHEMATICAL CENTROID CALCULATION ---
 
+        /**
+         * Calculates the geographic center (centroid) using the Cartesian coordinate method (center of mass).
+         * This method is accurate for points distributed globally on a sphere.
+         * @param {Array} participants - List of participant objects with locality.
+         * @returns {Object} Centroid coordinates (lat, lon) and raw simulated coordinates.
+         */
         function calculateCentroid(participants) {
             let x = 0.0;
             let y = 0.0;
             let z = 0.0;
 
             // Step 1: Simulated Geocoder
-            // This is necessary because we cannot call a real Geocoding API (like Google Maps) from this simple HTML file.
-            // It assigns a constant, reproducible coordinate for each user's locality input.
+            // In a real app, you would use a service like Google Maps Geocoding API here.
+            // Here, we generate predictable, unique coordinates based on the locality string.
             const simulatedCoordinates = participants.map(p => {
-                // Generate predictable coordinates based on the locality string length + first char code
-                const hash = p.locality.length + p.locality.charCodeAt(0);
+                const localityKey = p.locality.trim().toLowerCase();
+                const hash = localityKey.length + localityKey.charCodeAt(0) + localityKey.charCodeAt(localityKey.length - 1);
                 
                 // Base coordinates (Bengaluru, India - 12.97, 77.59)
+                // Offset by a small amount based on the hash to simulate unique locations.
                 const lat = 12.9716 + (hash % 100) / 1000;
                 const lon = 77.5946 + (hash % 100) / 1000; 
 
@@ -545,7 +551,8 @@
                 const latRad = toRadian(p.lat);
                 const lonRad = toRadian(p.lon);
 
-                // Step 2: Convert Lat/Lon to Cartesian (x, y, z)
+                // Step 2: Convert Lat/Lon to 3D Cartesian (x, y, z) coordinates
+                // This correctly weights the points on a spherical surface.
                 x += Math.cos(latRad) * Math.cos(lonRad);
                 y += Math.cos(latRad) * Math.sin(lonRad);
                 z += Math.sin(latRad);
@@ -604,6 +611,7 @@
                 BUTTON_TEXT.textContent = 'Generating Local Recommendations...';
 
                 // 2. SIMULATE LOCAL RECOMMENDATIONS & TRAVEL DETAILS
+                // Uses the calculated centroid to generate 3 realistic, simulated spots.
                 const recommendations = generateSimulatedRecommendations(
                     participants, 
                     occasion, 
@@ -634,7 +642,8 @@
         function generateSimulatedRecommendations(participants, occasion, centroidString, rawCoordinates) {
             // Determine if participants are close or far based on the simulated coordinates
             const isLocal = rawCoordinates.every(c => Math.abs(c.lat - rawCoordinates[0].lat) < 0.1 && Math.abs(c.lon - rawCoordinates[0].lon) < 0.1);
-            const type = occasion.toLowerCase().includes('coffee') || occasion.toLowerCase().includes('hangout') ? 'Cafe' : 'Restaurant';
+            const type = occasion.toLowerCase().includes('coffee') || occasion.toLowerCase().includes('hangout') ? 'Cafe' : 
+                         occasion.toLowerCase().includes('dinner') || occasion.toLowerCase().includes('foodie') ? 'Restaurant' : 'Park or Landmark';
 
             const getTravelDetails = (destinationLat, destinationLon) => {
                 return participants.map((p, index) => {
@@ -688,7 +697,7 @@
             ];
         }
         
-        // 🟡 FALLBACK FOR CATASTROPHIC FAILURES (If the math itself fails, this provides static data)
+        // 🟡 FALLBACK FOR CATASTROPHIC FAILURES 
         function generateFallbackRecommendations(localities, occasion, centroid) {
             const place = occasion.toLowerCase().includes('food') ? 'Gourmet Food Market' : 'Public Library';
             
@@ -714,7 +723,7 @@
         }
 
 
-        // RESULT DISPLAY (Standard)
+        // RESULT DISPLAY, EVENT LISTENERS, UTILITIES (Standard)
         function displayResults(recommendations, sources) {
             RECOMMENDATIONS_LIST.innerHTML = '';
             recommendations.forEach(place => {
@@ -747,7 +756,6 @@
             RESULTS_SECTION.classList.remove('hidden');
         }
 
-        // EVENT LISTENERS (Standard)
         function setupListeners() {
             PROFILE_FORM.addEventListener('submit', saveProfile);
             CREATE_GROUP_BTN.addEventListener('click', createGroupSession);
@@ -765,7 +773,6 @@
             SHOW_JOIN_BTN.addEventListener('click', () => setView('main', 'join'));
         }
 
-        // UTILITIES (Standard)
         function copyToClipboard(text, item) {
             if (!text) return;
             try {
