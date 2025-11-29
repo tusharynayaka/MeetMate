@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Meetup Planner Extended (Latlong.ai API)</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght0400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
           crossorigin=""/>
@@ -71,6 +71,15 @@
             padding: 2px 6px;
             border-radius: 4px;
             margin-left: 8px;
+        }
+        /* Custom Leaflet Icon Styles (must be in the <style> block) */
+        .custom-div-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+            line-height: 1; /* Adjust to better center the emoji/text */
+            transform: translate(-50%, -100%); /* Center the icon bottom point */
         }
     </style>
 </head>
@@ -298,7 +307,6 @@
         }
 
         function formatDistance(meters, isRouted = true) {
-            // Rectified formatDistance to clearly label non-routed distances
             const suffix = isRouted ? '' : ' (Straight Line)';
             if (meters === Infinity) return 'N/A';
             if (meters < 1000) return `${Math.round(meters)} m${suffix}`;
@@ -356,6 +364,11 @@
         // --- Map Visualization Functions ---
 
         function initMap(centerLat, centerLon) {
+            // Check if L (Leaflet) is defined before calling its functions
+            if (typeof L === 'undefined') {
+                console.error("Leaflet library (L) is not defined.");
+                return;
+            }
             if (map) {
                 map.remove();
             }
@@ -366,6 +379,8 @@
         }
 
         function addMarker(lat, lon, popupText, iconType = 'default') {
+            if (typeof L === 'undefined') return;
+
             // Using different color classes for better map visualization
             let markerColor = iconType === 'center' ? 'red' : (iconType === 'landmark' ? 'blue' : 'green');
             
@@ -374,12 +389,14 @@
             if (iconType === 'center') iconHtml = '⭐';
             else if (iconType === 'origin') iconHtml = '🏠';
 
-            let markerIcon = new L.DivIcon({
-                className: `custom-div-icon bg-${markerColor}-600 rounded-full w-6 h-6 text-white text-base text-center leading-6 shadow-xl font-bold`,
-                html: iconHtml
+            // CORRECTED: Ensure L.DivIcon is used correctly with the class defined in CSS
+            let markerIcon = L.divIcon({
+                className: `custom-div-icon bg-${markerColor}-600 rounded-full w-6 h-6 text-white text-base text-center shadow-xl font-bold`,
+                html: iconHtml,
+                iconSize: [24, 24], // Set size
+                iconAnchor: [12, 24] // Set anchor to the bottom center (for pointer effect)
             });
 
-            // Added autoClose: false to keep popups open for clarity
             const marker = L.marker([lat, lon], {icon: markerIcon}).addTo(map);
             marker.bindPopup(popupText, { closeButton: false, autoClose: false }).openPopup(); 
             return marker;
@@ -696,6 +713,13 @@
             
             if (results.length === 0) {
                 RECOMMENDATIONS_LIST.innerHTML = '<p class="text-gray-500 italic">No valid meetup locations could be calculated. Please check your addresses or API quota.</p>';
+                RESULTS_SECTION.classList.remove('hidden');
+                return;
+            }
+            
+            // Check if L (Leaflet) is defined before trying to initialize the map
+            if (typeof L === 'undefined') {
+                RECOMMENDATIONS_LIST.innerHTML = '<p class="text-red-500 font-bold">Error: Map library (Leaflet) failed to load. Cannot display map or markers.</p>';
                 RESULTS_SECTION.classList.remove('hidden');
                 return;
             }
@@ -1032,6 +1056,8 @@
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
+                
+                // Initialize Leaflet functions only after DOM is ready
                 setupListeners();
 
                 // Start anonymous authentication immediately
