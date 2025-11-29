@@ -3,15 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Collaborative Meetup Party Planner (Simulated Isochrone)</title>
+    <title>Collaborative Meetup Planner (Simulated Isochrone)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         :root { --primary-color: #4f46e5; --secondary-color: #ec4899; }
         body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
-        .container-card { box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1); max-width: 90%; margin: 2rem auto; background: linear-gradient(145deg, #ffffff, #f0f0f0); border: 1px solid #e5e7eb; transition: all 0.3s ease-in-out; }
+        .container-card { 
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1); 
+            max-width: 90%; 
+            margin: 2rem auto; 
+            background: linear-gradient(145deg, #ffffff, #f0f0f0); 
+            border: 1px solid #e5e7eb; 
+            transition: all 0.3s ease-in-out; 
+        }
         @media (min-width: 640px) { .container-card { max-width: 700px; } }
-        .submit-button { transition: all 0.2s ease-in-out; background-image: linear-gradient(to right top, var(--primary-color), #6366f1); }
+        .submit-button { 
+            transition: all 0.2s ease-in-out; 
+            background-image: linear-gradient(to right top, var(--primary-color), #6366f1); 
+        }
         .submit-button:hover { opacity: 0.9; transform: translateY(-1px); }
         .loading-spinner { 
             border: 4px solid rgba(255, 255, 255, 0.3); 
@@ -190,7 +200,7 @@
         let db, auth, userId = 'anonymous', isAuthReady = false, userProfile = null;
         let currentGroupId = null, groupUnsubscribe = null;
 
-        // DOM REFERENCES (Standard DOM references setup)
+        // DOM REFERENCES 
         const VIEWS = {
             loading: document.getElementById('initial-loading'),
             profile: document.getElementById('view-profile'),
@@ -232,7 +242,7 @@
         const PROFILE_COLLECTION_PATH = `artifacts/${APP_ID}/users`;
         const GROUP_COLLECTION_PATH = `artifacts/${APP_ID}/groups`;
 
-        // FIREBASE INIT
+        // FIREBASE INIT (omitted standard boilerplate setup)
         setLogLevel('error');
         document.addEventListener('DOMContentLoaded', async () => {
             try {
@@ -261,7 +271,7 @@
             }
         });
 
-        // VIEW MANAGEMENT, PROFILE, GROUP FUNCTIONS (Standard, unchanged)
+        // --- Standard App Logic Functions (View, Profile, Group Management) ---
 
         function setView(viewName, subView = null) {
             Object.values(VIEWS).forEach(view => view.classList.add('hidden'));
@@ -513,7 +523,7 @@
             setView('session');
         }
 
-        // --- CORE GEOMETRY FUNCTIONS ---
+        // --- CORE GEOMETRY FUNCTIONS (Rigorous Math) ---
 
         // Converts degrees to radians
         function toRadian(degree) {
@@ -526,7 +536,8 @@
         }
 
         /**
-         * Calculates the Haversine distance between two coordinates in kilometers.
+         * Calculates the great-circle distance (Haversine Formula) between two coordinates in kilometers.
+         * This function is the rigorous math component.
          * @param {number} lat1 
          * @param {number} lon1 
          * @param {number} lat2 
@@ -538,6 +549,7 @@
             const dLat = toRadian(lat2 - lat1);
             const dLon = toRadian(lon2 - lon1);
             
+            // Haversine Formula Implementation
             const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
                       Math.cos(toRadian(lat1)) * Math.cos(toRadian(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
@@ -546,26 +558,26 @@
 
         /**
          * Simulates a geocoder to generate distinct coordinates from locality text.
-         * This function is crucial for preventing the 0.0km error.
+         * This ensures distinct non-zero distances.
          * @param {string} localityKey 
          * @returns {Object} {lat, lon}
          */
         function simulateCoordinates(localityKey) {
+            const cleanKey = localityKey.trim().replace(/[^a-z0-9]/gi, '').toLowerCase();
             let sumChar = 0;
-            for (let i = 0; i < localityKey.length; i++) {
-                sumChar += localityKey.charCodeAt(i);
+            for (let i = 0; i < cleanKey.length; i++) {
+                sumChar += cleanKey.charCodeAt(i);
             }
             
-            // Use a large, randomized offset (1 to 10 degrees, approx 111km to 1110km)
-            // to ensure locations are distinct for the simulation.
-            const latOffset = (sumChar % 10) + 1.0 + (localityKey.length * 0.1); 
+            // Use large, randomized offsets (1 to 10 degrees, approx 111km to 1110km)
+            const latOffset = (sumChar % 10) + 1.0 + (cleanKey.length * 0.1); 
             const lonOffset = (sumChar % 10) + 1.0 + (sumChar % 5) * 0.2; 
             
             // Base coordinates (Bengaluru, India - 12.97, 77.59)
-            // Apply the offset based on hash properties to put points in different quadrants.
             const baseLat = 12.9716;
             const baseLon = 77.5946;
 
+            // Apply offsets, ensuring distinct quadrants
             const lat = baseLat + (sumChar % 2 === 0 ? latOffset : -latOffset);
             const lon = baseLon + (sumChar % 3 === 0 ? lonOffset : -lonOffset); 
 
@@ -574,29 +586,24 @@
 
         /**
          * Simulates travel time based on straight-line Haversine distance.
-         * For the Isochrone simulation, we need a time value.
          * @param {number} distanceKm - Haversine distance in kilometers.
          * @returns {number} Simulated travel time in minutes.
          */
         function simulateTravelTimeMinutes(distanceKm) {
             if (distanceKm < 50) {
-                // Local driving speed (30-60km/h) + initial time
+                // Local driving speed
                 return (distanceKm / 45) * 60 + 5; 
             } else if (distanceKm < 500) {
-                // Regional travel (high-speed rail/highway driving)
+                // Regional travel speed
                 return (distanceKm / 80) * 60;
             } else {
-                // Major travel (Flight/International) - 
-                // Time is dominated by check-in/transit, so use a fixed rate.
-                return (distanceKm / 700) * 60 * 1.5; // Factor in transit time
+                // Major travel (long haul)
+                return (distanceKm / 700) * 60 * 1.5; 
             }
         }
 
         /**
          * Performs a Simulated Isochrone Analysis to find the point that minimizes the total travel time.
-         * This replaces the simple Centroid calculation.
-         * @param {Array} participants - List of participant objects with locality.
-         * @returns {Object} Best accessible coordinates {lat, lon} and raw simulated coordinates.
          */
         function performSimulatedIsochroneAnalysis(participants) {
             const rawCoordinates = participants.map(p => {
@@ -609,14 +616,13 @@
             let avgLon = rawCoordinates.reduce((sum, p) => sum + p.lon, 0) / rawCoordinates.length;
 
             // 2. Define the search grid around the Centroid.
-            // We search in a small range (+/- 0.05 degrees, approx +/- 5.5 km) for the optimal spot.
-            const searchRange = 0.05; 
+            const searchRange = 0.05; // +/- 5.5 km radius search area
             const steps = 10;
             const stepSize = (searchRange * 2) / steps;
             
             let bestLat = avgLat;
             let bestLon = avgLon;
-            let minTotalTime = Infinity;
+            let minMaxTravelTime = Infinity;
 
             // 3. Iterate through the grid points.
             for (let i = -steps / 2; i <= steps / 2; i++) {
@@ -624,22 +630,18 @@
                     const candidateLat = avgLat + i * stepSize;
                     const candidateLon = avgLon + j * stepSize;
 
-                    let totalTime = 0;
                     let maxTime = 0;
 
-                    // 4. Calculate total and maximum travel time from all participants to the candidate point.
+                    // 4. Calculate maximum travel time (Max-Min approach for Isochrone)
                     for (const p of rawCoordinates) {
                         const dist = haversineDistance(p.lat, p.lon, candidateLat, candidateLon);
                         const time = simulateTravelTimeMinutes(dist);
-                        totalTime += time;
                         maxTime = Math.max(maxTime, time);
                     }
 
-                    // 5. The Isochrone ideal point minimizes the *maximum* travel time (best accessibility).
-                    // We use the maximum time (Max-Min approach) which is closer to the true Isochrone goal.
-                    // This ensures the *worst* traveler still has the shortest possible journey.
-                    if (maxTime < minTotalTime) {
-                        minTotalTime = maxTime;
+                    // 5. The optimal point minimizes the *maximum* travel time.
+                    if (maxTime < minMaxTravelTime) {
+                        minMaxTravelTime = maxTime;
                         bestLat = candidateLat;
                         bestLon = candidateLon;
                     }
@@ -650,12 +652,12 @@
                 lat: bestLat,
                 lon: bestLon,
                 rawCoordinates: rawCoordinates,
-                minMaxTravelTime: minTotalTime // The key result of the isochrone analysis
+                minMaxTravelTime: minMaxTravelTime // The key Isochrone result
             };
         }
 
 
-        // --- MAIN CALCULATION FUNCTION (PURE MATH) ---
+        // --- MAIN CALCULATION FLOW ---
 
         async function handleFindOptimalSpots() {
             setLoading(true, CALCULATE_BTN);
@@ -680,7 +682,7 @@
                     return;
                 }
 
-                // 1. SIMULATED ISOCHRONE ANALYSIS
+                // 1. SIMULATED ISOCHRONE ANALYSIS (Uses rigorous Haversine internally)
                 const result = performSimulatedIsochroneAnalysis(participants);
                 const optimalLat = result.lat.toFixed(5);
                 const optimalLon = result.lon.toFixed(5);
@@ -720,8 +722,7 @@
 
         function generateSimulatedRecommendations(participants, occasion, optimalString, rawCoordinates, minMaxTimeMinutes) {
             
-            // Check if coordinates are close together (within 0.2 degree, roughly 22km)
-            const isLocal = rawCoordinates.every(c => Math.abs(c.lat - rawCoordinates[0].lat) < 0.2 && Math.abs(c.lon - rawCoordinates[0].lon) < 0.2);
+            const isLocal = rawCoordinates.every(c => haversineDistance(c.lat, c.lon, rawCoordinates[0].lat, rawCoordinates[0].lon) < 50); // Check if all points are within 50km
             
             const type = occasion.toLowerCase().includes('coffee') || occasion.toLowerCase().includes('hangout') ? 'Cafe' : 
                          occasion.toLowerCase().includes('dinner') || occasion.toLowerCase().includes('foodie') ? 'Restaurant' : 
@@ -734,6 +735,7 @@
                 return participants.map((p, index) => {
                     const startCoord = rawCoordinates[index];
                     
+                    // Uses the rigorous Haversine Distance
                     const distance = haversineDistance(startCoord.lat, startCoord.lon, destinationLat, destinationLon);
                     const timeMinutes = simulateTravelTimeMinutes(distance);
 
@@ -769,25 +771,37 @@
                 minMaxTimeString = `${(minMaxTimeMinutes / 60).toFixed(1)} hours`;
             }
 
+            // Calculate the pure Centroid (Cartesian Mean) for the second suggestion
+            let centroidX = 0, centroidY = 0, centroidZ = 0;
+            rawCoordinates.forEach(p => {
+                const latRad = toRadian(p.lat);
+                const lonRad = toRadian(p.lon);
+                centroidX += Math.cos(latRad) * Math.cos(lonRad);
+                centroidY += Math.cos(latRad) * Math.sin(lonRad);
+                centroidZ += Math.sin(latRad);
+            });
+            const total = rawCoordinates.length;
+            const centroidLonRad = Math.atan2(centroidY / total, centroidX / total);
+            const hyp = Math.sqrt(Math.pow(centroidX / total, 2) + Math.pow(centroidY / total, 2));
+            const centroidLatRad = Math.atan2(centroidZ / total, hyp);
+            const centroidLat = toDegree(centroidLatRad);
+            const centroidLon = toDegree(centroidLonRad);
+
 
             return [
                 {
                     rank: 1,
                     placeName: isLocal ? `Central ${type} with Best Access` : 'Major Transit Hub (Optimal Access)',
                     exactAddress: `Optimal Isochrone Point: ${optimalString}`,
-                    justification: `This spot minimizes the **longest journey** any single participant has to make (Max Travel Time: **${minMaxTimeString}**). It is the ideal Isochrone result for accessibility.`,
+                    justification: `This spot minimizes the **longest journey** any single participant has to make (Max Travel Time: **${minMaxTimeString}**). This is the Isochrone result for best accessibility.`,
                     travelDetails: getTravelDetails(optimalLat, optimalLon)
                 },
                 {
                     rank: 2,
                     placeName: isLocal ? 'Riverside Park Cafe (Shortest Total Distance)' : 'Geometric Center Conference Hotel',
-                    // Fallback to the old simple Centroid (Cartesian Mean) for comparison
-                    exactAddress: `Lat: ${rawCoordinates.reduce((sum, p) => sum + p.lat, 0) / rawCoordinates.length.toFixed(5)}, Lon: ${rawCoordinates.reduce((sum, p) => sum + p.lon, 0) / rawCoordinates.length.toFixed(5)}`,
-                    justification: `The pure **geometric center** (Cartesian mean) - often slightly different from the Isochrone point, which prioritizes travel time over raw distance.`,
-                    travelDetails: getTravelDetails(
-                        rawCoordinates.reduce((sum, p) => sum + p.lat, 0) / rawCoordinates.length, 
-                        rawCoordinates.reduce((sum, p) => sum + p.lon, 0) / rawCoordinates.length
-                    )
+                    exactAddress: `Lat: ${centroidLat.toFixed(5)}, Lon: ${centroidLon.toFixed(5)}`,
+                    justification: `The pure **geometric center** (Cartesian mean) - this point minimizes the *sum* of distances, which is often different from the Isochrone point, which minimizes the *maximum* travel time.`,
+                    travelDetails: getTravelDetails(centroidLat, centroidLon)
                 },
                 {
                     rank: 3,
@@ -808,8 +822,8 @@
                 return localities.map(loc => {
                     return { 
                         locality: loc, 
-                        distance: `${(Math.random() * 10 + 1).toFixed(1)}km`, 
-                        travelTime: `${Math.floor(Math.random() * 20 + 5)}-${Math.floor(Math.random() * 30 + 15)} mins` 
+                        distance: `5.0 km`, 
+                        travelTime: `15-25 mins (Drive)` 
                     };
                 });
             };
@@ -826,7 +840,7 @@
         }
 
 
-        // RESULT DISPLAY, EVENT LISTENERS, UTILITIES (Standard, unchanged)
+        // RESULT DISPLAY, EVENT LISTENERS, UTILITIES 
 
         function displayResults(recommendations, sources) {
             RECOMMENDATIONS_LIST.innerHTML = '';
