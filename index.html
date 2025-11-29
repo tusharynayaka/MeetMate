@@ -686,49 +686,49 @@
                 // 5. Sort and Display Results
                 // ... (End of step 4 loop, where all results are in the 'results' array)
 
-                // 5. Advanced Ranking, Isochrone Filtering, and Display
+// 5. Advanced Ranking, Isochrone Filtering, and Display
 
-                // Sort results primarily by distance to find the BEST theoretical travel hub
-                const bestDistanceResult = results.sort((a, b) => a.totalDistance - b.totalDistance)[0];
+// Sort results primarily by distance to find the BEST theoretical travel hub
+const bestDistanceResult = results.sort((a, b) => a.totalDistance - b.totalDistance)[0];
 
-                let bestTravelTime = bestDistanceResult.maxDuration; // Use the max travel time (duration) from the best distance location
-                if (bestTravelTime === 0 || bestTravelTime === Infinity) {
-                    // Fallback time limit (e.g., 30 minutes) if routed times are unavailable
-                    bestTravelTime = 1800; 
-                }
+let bestTravelTime = bestDistanceResult.maxDuration; // Use the max travel time (duration) from the best distance location
+if (bestTravelTime === 0 || bestTravelTime === Infinity) {
+    // Fallback time limit (e.g., 30 minutes) if routed times are unavailable
+    bestTravelTime = 1800; 
+}
 
-                showStatus(`Step 5/5: Finding accessible area (Isochrone) for max travel time of ${formatTime(bestTravelTime)}...`, false);
+showStatus(`Step 5/5: Finding accessible area (Isochrone) for max travel time of ${formatTime(bestTravelTime)}...`, false);
 
-                // A. Get the Isochrone Polygon for the theoretical center
-                const centerLocation = potentialLocations.find(loc => loc.isCentroid);
-                let isochroneGeoJSON = null;
+// A. Get the Isochrone Polygon for the theoretical center
+const centerLocation = potentialLocations.find(loc => loc.isCentroid);
+let isochroneGeoJSON = null;
 
-                if (centerLocation) {
-                    isochroneGeoJSON = await getIsochronePolygon(centerLocation.lat, centerLocation.lon, bestTravelTime);
-                }
+if (centerLocation) {
+    isochroneGeoJSON = await getIsochronePolygon(centerLocation.lat, centerLocation.lon, bestTravelTime);
+}
 
-                // B. Final Sort, Rank, and Filter
-                const finalRankedResults = results
-                    .filter(location => !location.isCentroid) // Don't rank the mathematical center itself
-                    .sort((a, b) => {
-                        // Primary sort: Prioritize fully routed results
-                        if (a.allRouted !== b.allRouted) {
-                            return a.allRouted ? -1 : 1; 
-                        }
-                        // Secondary sort: Then by total distance
-                        return a.totalDistance - b.totalDistance;
-                    })
-                    .slice(0, 5) // Show top 5 real-world suggestions
+// B. Final Sort, Rank, and Filter
+const finalRankedResults = results
+    .filter(location => !location.isCentroid) // Don't rank the mathematical center itself
+    .sort((a, b) => {
+        // Primary sort: Prioritize fully routed results
+        if (a.allRouted !== b.allRouted) {
+            return a.allRouted ? -1 : 1; 
+        }
+        // Secondary sort: Then by total distance
+        return a.totalDistance - b.totalDistance;
+    })
+    .slice(0, 5) // Show top 5 real-world suggestions
 
-                // Add the center back at Rank 0, but only for informational purposes
-                if (centerLocation) {
-                    finalRankedResults.unshift(results.find(loc => loc.isCentroid));
-                }
+// Add the center back at Rank 0, but only for informational purposes
+if (centerLocation) {
+    finalRankedResults.unshift(results.find(loc => loc.isCentroid));
+}
 
-                // C. Display results and the isochrone boundary
-                displayResults(finalRankedResults, validParticipants, isochroneGeoJSON);
+// C. Display results and the isochrone boundary
+displayResults(finalRankedResults, validParticipants, isochroneGeoJSON);
 
-                showStatus('Calculation complete! Results displayed.', false);
+showStatus('Calculation complete! Results displayed.', false);
 // ... (rest of finally block)
                 const sortedResults = results
                     .sort((a, b) => {
