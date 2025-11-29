@@ -186,7 +186,7 @@
         import { getFirestore, doc, getDoc, setDoc, addDoc, collection, onSnapshot, updateDoc, arrayUnion, query, where, getDocs, deleteDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
         // =========================================================================
-        // ⚠️ LATLONG.AI CONFIGURATION
+        // ⚠️ LATLONG.AI CONFIGURATION: YOUR TOKEN IS EMBEDDED HERE
         // =========================================================================
 
         // 1. Latlong.ai API Key/Token: (Provided by the user)
@@ -511,6 +511,7 @@
                     const p = validParticipants[j];
                     const singleOrigin = `${p.lat},${p.lon}`;
 
+                    // Call the Distance Matrix API for a single origin-destination pair
                     const singleResult = await getDistanceMatrix(singleOrigin, destinationCoordinate, 'driving');
                     
                     if (singleResult.status === 'OK') {
