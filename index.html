@@ -150,7 +150,7 @@
                     <h2 class="text-2xl font-semibold text-gray-700 mb-4">Top Recommendations</h2>
                     <div id="recommendations-list" class="space-y-6"></div>
                     <div id="sources-container" class="mt-6 text-xs text-gray-500 border-t pt-4">
-                        <p class="font-medium mb-2">Sources & Grounding</p>
+                        <p class="font-medium mb-2">Sources & Grounding (Distances calculated using **Haversine Formula**)</p>
                         <ul id="sources-list" class="space-y-1"></ul>
                     </div>
                 </div>
@@ -164,7 +164,6 @@
         import { getFirestore, setLogLevel, doc, getDoc, setDoc, addDoc, collection, onSnapshot, updateDoc, arrayUnion, query, where, getDocs } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
         // CONFIGURATION SECTION
-        // Default Firebase config is included for basic app functionality (profile storage, group codes)
         const YOUR_FALLBACK_CONFIG = {
             apiKey: "AIzaSyBr2D6zEFX3u1wQTXE8aTgHFw5EeIUnsPE",
             authDomain: "html-9bee0.firebaseapp.com",
@@ -178,14 +177,11 @@
         const firebaseConfig = typeof firebaseconfig !== 'undefined' ? JSON.parse(firebaseconfig) : YOUR_FALLBACK_CONFIG;
         const APP_ID = typeof appid !== 'undefined' ? appid : 'meetup-party-planner-v1';
         
-        // **NOTICE: GEMINI API KEY IS REMOVED FROM LOGIC**
-        // const GEMINI_API_KEY = "REMOVED"; 
-
         // GLOBAL STATE
         let db, auth, userId = 'anonymous', isAuthReady = false, userProfile = null;
         let currentGroupId = null, groupUnsubscribe = null;
 
-        // DOM REFERENCES (Omitted for brevity)
+        // DOM REFERENCES (Standard DOM references setup)
         const VIEWS = {
             loading: document.getElementById('initial-loading'),
             profile: document.getElementById('view-profile'),
@@ -227,7 +223,7 @@
         const PROFILE_COLLECTION_PATH = `artifacts/${APP_ID}/users`;
         const GROUP_COLLECTION_PATH = `artifacts/${APP_ID}/groups`;
 
-        // FIREBASE INIT (Standard)
+        // FIREBASE INIT
         setLogLevel('error');
         document.addEventListener('DOMContentLoaded', async () => {
             try {
@@ -256,7 +252,8 @@
             }
         });
 
-        // VIEW MANAGEMENT, PROFILE, GROUP FUNCTIONS (Standard)
+        // VIEW MANAGEMENT, PROFILE, GROUP FUNCTIONS (Standard, unchanged)
+
         function setView(viewName, subView = null) {
             Object.values(VIEWS).forEach(view => view.classList.add('hidden'));
             if (viewName === 'profile') VIEWS.profile.classList.remove('hidden');
@@ -507,7 +504,7 @@
             setView('session');
         }
 
-        // --- NEW GEOMETRY UTILITY FUNCTIONS ---
+        // --- CORE GEOMETRY FUNCTIONS ---
 
         // Converts degrees to radians
         function toRadian(degree) {
@@ -519,11 +516,8 @@
             return radian * 180 / Math.PI;
         }
 
-        // --- CORE MATHEMATICAL CENTROID CALCULATION ---
-
         /**
          * Calculates the geographic center (centroid) using the Cartesian coordinate method (center of mass).
-         * This method is accurate for points distributed globally on a sphere.
          * @param {Array} participants - List of participant objects with locality.
          * @returns {Object} Centroid coordinates (lat, lon) and raw simulated coordinates.
          */
@@ -532,14 +526,12 @@
             let y = 0.0;
             let z = 0.0;
 
-            // Step 1: Simulated Geocoder
-            // In a real app, you would use a service like Google Maps Geocoding API here.
-            // Here, we generate predictable, unique coordinates based on the locality string.
+            // Step 1: Simulated Geocoder - Generates predictable coordinates for localities.
             const simulatedCoordinates = participants.map(p => {
                 const localityKey = p.locality.trim().toLowerCase();
                 const hash = localityKey.length + localityKey.charCodeAt(0) + localityKey.charCodeAt(localityKey.length - 1);
                 
-                // Base coordinates (Bengaluru, India - 12.97, 77.59)
+                // Base coordinates (Bengaluru, India)
                 // Offset by a small amount based on the hash to simulate unique locations.
                 const lat = 12.9716 + (hash % 100) / 1000;
                 const lon = 77.5946 + (hash % 100) / 1000; 
@@ -552,7 +544,6 @@
                 const lonRad = toRadian(p.lon);
 
                 // Step 2: Convert Lat/Lon to 3D Cartesian (x, y, z) coordinates
-                // This correctly weights the points on a spherical surface.
                 x += Math.cos(latRad) * Math.cos(lonRad);
                 y += Math.cos(latRad) * Math.sin(lonRad);
                 z += Math.sin(latRad);
@@ -611,7 +602,6 @@
                 BUTTON_TEXT.textContent = 'Generating Local Recommendations...';
 
                 // 2. SIMULATE LOCAL RECOMMENDATIONS & TRAVEL DETAILS
-                // Uses the calculated centroid to generate 3 realistic, simulated spots.
                 const recommendations = generateSimulatedRecommendations(
                     participants, 
                     occasion, 
@@ -625,7 +615,7 @@
             } catch (error) {
                 console.error('Calculation error:', error);
                 showStatus(`Mathematical calculation failed: ${error.message}`, true);
-                // Fallback (if any part of the math itself failed)
+                // Fallback 
                 displayResults(generateFallbackRecommendations(
                     participants.map(p => p.locality), 
                     group.occasion, 
@@ -637,29 +627,44 @@
         }
 
 
-        // --- SIMULATION FUNCTION (To generate results without a real geocoder/AI) ---
+        // --- SIMULATION & HAVERSINE DISTANCE FUNCTION ---
 
         function generateSimulatedRecommendations(participants, occasion, centroidString, rawCoordinates) {
-            // Determine if participants are close or far based on the simulated coordinates
+            // Check if coordinates are close together (within 0.1 degree, roughly 11km)
             const isLocal = rawCoordinates.every(c => Math.abs(c.lat - rawCoordinates[0].lat) < 0.1 && Math.abs(c.lon - rawCoordinates[0].lon) < 0.1);
             const type = occasion.toLowerCase().includes('coffee') || occasion.toLowerCase().includes('hangout') ? 'Cafe' : 
                          occasion.toLowerCase().includes('dinner') || occasion.toLowerCase().includes('foodie') ? 'Restaurant' : 'Park or Landmark';
 
+            /**
+             * Calculates the great-circle distance (Haversine) and simulates travel time.
+             */
             const getTravelDetails = (destinationLat, destinationLon) => {
                 return participants.map((p, index) => {
                     const startCoord = rawCoordinates[index];
                     
-                    // Haversine Distance Calculation (approximate distance on sphere)
+                    // --- Haversine Distance Calculation ---
                     const R = 6371; // Earth radius in km
                     const dLat = toRadian(destinationLat - startCoord.lat);
                     const dLon = toRadian(destinationLon - startCoord.lon);
+                    
                     const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
                               Math.cos(toRadian(startCoord.lat)) * Math.cos(toRadian(destinationLat)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
                     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-                    const distance = R * c; // Distance in km
-
-                    const distStr = isLocal ? `${distance.toFixed(1)} km` : `${Math.floor(distance / 10) * 10} km`;
-                    const timeStr = isLocal ? `${Math.floor(distance * 2) + 5}-${Math.floor(distance * 3) + 15} mins (Drive)` : '1-5 hrs (Major Travel)';
+                    const distance = R * c; // Accurate straight-line distance (km)
+                    
+                    // --- Simulated Travel Time based on Distance ---
+                    const distStr = distance < 1000 ? `${distance.toFixed(1)} km` : `${Math.floor(distance / 100) * 100} km`;
+                    let timeStr;
+                    if (distance < 50) {
+                        // Local travel, estimated drive time (Distance * 2 to 3 minutes/km + base time)
+                        timeStr = `${Math.floor(distance * 2) + 5}-${Math.floor(distance * 3) + 15} mins (Drive)`;
+                    } else if (distance < 500) {
+                        // Regional travel
+                        timeStr = `${Math.floor(distance / 80)} hrs (Rail/Long Drive)`;
+                    } else {
+                        // Major travel
+                        timeStr = `${Math.floor(distance / 700)} hrs (Flight/Major Transit)`;
+                    }
                     
                     return {
                         locality: p.locality,
@@ -683,6 +688,7 @@
                 {
                     rank: 2,
                     placeName: isLocal ? 'Riverside Park Cafe (Shortest Total Distance)' : 'Halfway Point Conference Center',
+                    // Slight offset from the true centroid for an alternative suggestion
                     exactAddress: `Lat: ${(centroidLat + 0.005).toFixed(5)}, Lon: ${(centroidLon - 0.002).toFixed(5)}`,
                     justification: `A slight adjustment to the center, often offering better amenities or transport links.`,
                     travelDetails: getTravelDetails(centroidLat + 0.005, centroidLon - 0.002)
@@ -690,6 +696,7 @@
                 {
                     rank: 3,
                     placeName: isLocal ? `The ${type} Landmark` : 'Major Transit Station near the Median',
+                    // Another slight offset
                     exactAddress: `Lat: ${(centroidLat - 0.003).toFixed(5)}, Lon: ${(centroidLon + 0.004).toFixed(5)}`,
                     justification: `A recognizable landmark, serving as an easy meeting point, optimized for ease of arrival.`,
                     travelDetails: getTravelDetails(centroidLat - 0.003, centroidLon + 0.004)
@@ -723,7 +730,8 @@
         }
 
 
-        // RESULT DISPLAY, EVENT LISTENERS, UTILITIES (Standard)
+        // RESULT DISPLAY, EVENT LISTENERS, UTILITIES (Standard, unchanged)
+
         function displayResults(recommendations, sources) {
             RECOMMENDATIONS_LIST.innerHTML = '';
             recommendations.forEach(place => {
